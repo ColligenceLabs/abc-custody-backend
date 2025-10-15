@@ -224,6 +224,16 @@ async function waitForConfirmation(txHash, confirmations = 1) {
   return receipt;
 }
 
+/**
+ * 트랜잭션 영수증 조회
+ * @param {string} txHash - 트랜잭션 해시
+ * @returns {Promise<object|null>} 트랜잭션 영수증 (없으면 null)
+ */
+async function getTransactionReceipt(txHash) {
+  const receipt = await provider.getTransactionReceipt(txHash);
+  return receipt;
+}
+
 module.exports = {
   provider,
   weiToEth,
@@ -236,5 +246,6 @@ module.exports = {
   createETHTransfer,
   createERC20Transfer,
   sendTransaction,
-  waitForConfirmation
+  waitForConfirmation,
+  getTransactionReceipt
 };

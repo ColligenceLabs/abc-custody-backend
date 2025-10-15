@@ -41,12 +41,66 @@ const BLOCKCHAIN_ENV = process.env.BLOCKCHAIN_ENV || 'testnet';
 const MIN_GAS_BALANCE = '0.001'; // 0.001 ETH
 
 /**
+ * sent 상태인 Vault Transfer 확인 및 업데이트
+ */
+async function checkSentTransfers() {
+  try {
+    const { getTransactionReceipt } = require('../utils/ethereum');
+
+    // sent 상태인 vault transfer 조회
+    const sentTransfers = await VaultTransfer.findAll({
+      where: { status: 'sent' }
+    });
+
+    if (sentTransfers.length === 0) {
+      return;
+    }
+
+    console.log(`[Vault Transfer] sent 상태 ${sentTransfers.length}건 확인 중...`);
+
+    for (const transfer of sentTransfers) {
+      try {
+        // 트랜잭션 receipt 확인
+        const receipt = await getTransactionReceipt(transfer.txHash);
+
+        if (receipt && receipt.status === '0x1') {
+          // 성공한 트랜잭션
+          const gasFee = (BigInt(receipt.gasUsed) * BigInt(receipt.gasPrice || receipt.effectiveGasPrice)).toString();
+
+          await transfer.update({
+            gasUsed: receipt.gasUsed.toString(),
+            gasFee: (parseInt(gasFee) / 1e18).toFixed(18),
+            status: 'confirmed',
+            confirmedAt: new Date()
+          });
+
+          // Deposit 상태 업데이트
+          const deposit = await Deposit.findByPk(transfer.depositId);
+          if (deposit && deposit.status !== 'credited') {
+            await deposit.update({ status: 'credited' });
+          }
+
+          console.log(`[Vault Transfer] ${transfer.txHash} confirmed 완료`);
+        }
+      } catch (error) {
+        console.error(`[Vault Transfer] ${transfer.txHash} 확인 실패:`, error.message);
+      }
+    }
+  } catch (error) {
+    console.error('[Vault Transfer] sent 상태 확인 실패:', error);
+  }
+}
+
+/**
  * Vault 전송 크롤러 메인 함수
  */
 async function runVaultTransferCrawler() {
   console.log('[Vault Transfer] Vault 전송 시작...');
 
   try {
+    // 0. sent 상태인 레코드 먼저 확인
+    await checkSentTransfers();
+
     // 1. BlockDaemon Vault 주소 조회
     const vaultAddress = await getDefaultVaultEthAddress();
     console.log(`[Vault Transfer] 목적지 Vault 주소: ${vaultAddress}`);
