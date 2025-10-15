@@ -6,7 +6,8 @@
 const { DepositAddress, Deposit, Address } = require('../models');
 const {
   getCurrentBlock,
-  getTransactionsByAddress,
+  getTransactionsSinceBlock,
+  getTransactionsForAddress,
   calculateConfirmations,
   hexToDecimal,
 } = require('../utils/quicknode');
@@ -38,8 +39,20 @@ async function runDepositCrawler() {
     let newDepositsCount = 0;
     for (const addr of depositAddresses) {
       try {
-        const txsResult = await getTransactionsByAddress(addr.address, 1, 10);
-        const transactions = txsResult?.paginatedItems || [];
+        let transactions = [];
+        let lastCheckedBlock = addr.lastCheckedBlock;
+
+        // Mainnet: qn_getTransactionsByAddress 사용
+        // Testnet: DB 기반 블록 추적 사용 (효율성 향상)
+        if (process.env.BLOCKCHAIN_ENV === 'mainnet') {
+          const txsResult = await getTransactionsForAddress(addr.address, 1, 10);
+          transactions = txsResult?.paginatedItems || [];
+        } else {
+          // Testnet: 마지막 조회 블록 이후만 조회 (최대 10블록)
+          const result = await getTransactionsSinceBlock(addr.address, lastCheckedBlock, 10);
+          transactions = result.transactions;
+          lastCheckedBlock = result.lastCheckedBlock;
+        }
 
         for (const tx of transactions) {
           // 입금 트랜잭션인지 확인 (toAddress가 우리 주소)
@@ -85,7 +98,7 @@ async function runDepositCrawler() {
                 depositAddressId: addr.id,
                 txHash: tx.transactionHash,
                 asset: addr.coin,
-                network: addr.network || 'Sepolia',
+                network: process.env.BLOCKCHAIN_ENV === 'mainnet' ? 'Ethereum' : 'Holesky',
                 amount: ethAmount,
                 fromAddress: tx.fromAddress,
                 toAddress: tx.toAddress,
@@ -105,6 +118,12 @@ async function runDepositCrawler() {
               );
             }
           }
+        }
+
+        // Testnet: 마지막 조회 블록 업데이트 (에러 없이 완료된 경우만)
+        if (process.env.BLOCKCHAIN_ENV !== 'mainnet' && lastCheckedBlock) {
+          await addr.update({ lastCheckedBlock });
+          console.log(`[Deposit Crawler] 주소 ${addr.address} 마지막 블록 업데이트: ${lastCheckedBlock}`);
         }
       } catch (error) {
         console.error(`[Deposit Crawler] 주소 ${addr.address} 처리 실패:`, error.message);

@@ -65,6 +65,12 @@ module.exports = (sequelize) => {
     priceUSD: {
       type: DataTypes.DECIMAL(20, 2),
       allowNull: true
+    },
+    lastCheckedBlock: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: null,
+      comment: 'Last block number checked for deposits'
     }
   }, {
     tableName: 'deposit_addresses',

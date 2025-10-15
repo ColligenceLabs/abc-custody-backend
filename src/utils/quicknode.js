@@ -1,14 +1,18 @@
 /**
- * QuickNode Sepolia RPC API Utility (Backend)
- * Token and NFT API v2 Bundle 포함
+ * QuickNode RPC API Utility (Backend)
+ * Mainnet: Ethereum Mainnet with Token and NFT API v2 Bundle
+ * Testnet: Holesky with Standard RPC
  */
 
 const axios = require('axios');
 
-const QUICKNODE_URL = process.env.QUICKNODE_SEPOLIA_URL;
+const BLOCKCHAIN_ENV = process.env.BLOCKCHAIN_ENV || 'testnet';
+const QUICKNODE_URL = BLOCKCHAIN_ENV === 'mainnet'
+  ? process.env.QUICKNODE_MAINNET_URL
+  : process.env.QUICKNODE_HOLESKY_URL;
 
 if (!QUICKNODE_URL) {
-  console.warn('QUICKNODE_SEPOLIA_URL이 설정되지 않았습니다.');
+  console.warn(`QUICKNODE URL이 설정되지 않았습니다. (환경: ${BLOCKCHAIN_ENV})`);
 }
 
 /**
@@ -53,7 +57,7 @@ async function getCurrentBlock() {
 
 /**
  * 특정 주소의 트랜잭션 조회 (QuickNode 전용 메소드)
- * Token and NFT API v2 Bundle 필요
+ * Token and NFT API v2 Bundle 필요 (Mainnet용)
  * @param {string} address - 이더리움 주소
  * @param {number} page - 페이지 번호 (기본값: 1)
  * @param {number} perPage - 페이지당 결과 수 (기본값: 100)
@@ -67,6 +71,102 @@ async function getTransactionsByAddress(address, page = 1, perPage = 100) {
       perPage,
     },
   ]);
+}
+
+/**
+ * 특정 블록 이후의 트랜잭션 조회 (Testnet용 - Holesky)
+ * Standard RPC 메소드 사용 - DB에 저장된 마지막 블록부터 조회
+ * @param {string} address - 이더리움 주소
+ * @param {number|null} fromBlock - 시작 블록 번호 (null이면 최근 10블록)
+ * @param {number} maxBlocksToCheck - 최대 조회 블록 수 (기본값: 10)
+ * @returns {Promise<{transactions: Array, lastCheckedBlock: number}>}
+ */
+async function getTransactionsSinceBlock(address, fromBlock = null, maxBlocksToCheck = 10) {
+  try {
+    const currentBlockHex = await getCurrentBlock();
+    const currentBlock = hexToDecimal(currentBlockHex);
+
+    // fromBlock이 null이면 최근 10블록만 조회
+    const startBlock = fromBlock ? fromBlock + 1 : Math.max(0, currentBlock - maxBlocksToCheck);
+    const endBlock = Math.min(currentBlock, startBlock + maxBlocksToCheck - 1);
+
+    console.log(`[QuickNode] 주소 ${address} 블록 ${startBlock} ~ ${endBlock} 조회 (총 ${endBlock - startBlock + 1}블록)`);
+
+    const transactions = [];
+    const seenTxHashes = new Set();
+
+    // startBlock부터 endBlock까지 순차 조회
+    for (let blockNum = startBlock; blockNum <= endBlock; blockNum++) {
+      try {
+        const blockHex = '0x' + blockNum.toString(16);
+        const block = await rpcCall('eth_getBlockByNumber', [blockHex, true]);
+
+        if (block && block.transactions) {
+          for (const tx of block.transactions) {
+            // 우리 주소로 들어온 트랜잭션만 필터링
+            if (tx.to && tx.to.toLowerCase() === address.toLowerCase() && !seenTxHashes.has(tx.hash)) {
+              seenTxHashes.add(tx.hash);
+              transactions.push({
+                transactionHash: tx.hash,
+                blockNumber: hexToDecimal(tx.blockNumber).toString(),
+                fromAddress: tx.from,
+                toAddress: tx.to,
+                value: hexToDecimal(tx.value).toString(),
+                timestamp: hexToDecimal(block.timestamp),
+              });
+            }
+          }
+        }
+      } catch (blockError) {
+        console.error(`블록 ${blockNum} 조회 실패:`, blockError.message);
+      }
+    }
+
+    return {
+      transactions,
+      lastCheckedBlock: endBlock
+    };
+  } catch (error) {
+    console.error('블록 기반 트랜잭션 조회 실패:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * eth_getBlockByNumber를 사용한 트랜잭션 조회 (레거시, 호환성 유지)
+ * @deprecated getTransactionsSinceBlock 사용 권장
+ * @param {string} address - 이더리움 주소
+ * @returns {Promise<any>} qn_getTransactionsByAddress 호환 형식
+ */
+async function getTransactionsByAddressLogs(address) {
+  try {
+    const result = await getTransactionsSinceBlock(address, null, 10);
+    return {
+      paginatedItems: result.transactions,
+      pageNumber: 1,
+      totalItems: result.transactions.length,
+    };
+  } catch (error) {
+    console.error('블록 기반 트랜잭션 조회 실패:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * 환경에 따라 적절한 메소드로 트랜잭션 조회
+ * Mainnet: qn_getTransactionsByAddress (Token API)
+ * Testnet: eth_getLogs 기반 조회
+ * @param {string} address - 이더리움 주소
+ * @param {number} page - 페이지 번호 (mainnet에서만 사용)
+ * @param {number} perPage - 페이지당 결과 수 (mainnet에서만 사용)
+ * @returns {Promise<any>} 트랜잭션 목록
+ */
+async function getTransactionsForAddress(address, page = 1, perPage = 100) {
+  if (BLOCKCHAIN_ENV === 'mainnet') {
+    return await getTransactionsByAddress(address, page, perPage);
+  } else {
+    return await getTransactionsByAddressLogs(address);
+  }
 }
 
 /**
@@ -130,6 +230,9 @@ module.exports = {
   rpcCall,
   getCurrentBlock,
   getTransactionsByAddress,
+  getTransactionsSinceBlock,
+  getTransactionsByAddressLogs,
+  getTransactionsForAddress,
   getTransactionReceipt,
   getTransactionByHash,
   getBalance,
