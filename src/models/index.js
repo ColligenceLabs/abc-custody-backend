@@ -27,6 +27,7 @@ db.User = require('./User')(sequelize);
 db.Address = require('./Address')(sequelize);
 db.DepositAddress = require('./DepositAddress')(sequelize);
 db.Deposit = require('./Deposit')(sequelize);
+db.VaultTransfer = require('./VaultTransfer')(sequelize);
 
 // Define associations
 db.User.hasMany(db.Address, { foreignKey: 'userId', as: 'addresses' });
@@ -40,5 +41,8 @@ db.Deposit.belongsTo(db.User, { foreignKey: 'userId', as: 'user' });
 
 db.DepositAddress.hasMany(db.Deposit, { foreignKey: 'depositAddressId', as: 'deposits' });
 db.Deposit.belongsTo(db.DepositAddress, { foreignKey: 'depositAddressId', as: 'depositAddress' });
+
+db.Deposit.hasMany(db.VaultTransfer, { foreignKey: 'depositId', as: 'vaultTransfers' });
+db.VaultTransfer.belongsTo(db.Deposit, { foreignKey: 'depositId', as: 'deposit' });
 
 module.exports = db;

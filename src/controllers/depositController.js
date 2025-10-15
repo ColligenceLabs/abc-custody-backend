@@ -31,15 +31,38 @@ exports.getDeposits = async (req, res) => {
     const limit = parseInt(_limit);
     const offset = (page - 1) * limit;
 
+    const { VaultTransfer } = require('../models');
+
     const { count, rows } = await Deposit.findAndCountAll({
       where,
+      include: [
+        {
+          model: VaultTransfer,
+          as: 'vaultTransfers',
+          required: false,
+          attributes: ['id', 'status', 'txHash', 'feeAmount', 'feeRate', 'transferredAt', 'confirmedAt']
+        }
+      ],
       limit,
       offset,
       order: [[_sort, _order.toUpperCase()]]
     });
 
+    // Vault 전송 정보 추가
+    const depositsWithVaultInfo = rows.map(deposit => {
+      const depositJson = deposit.toJSON();
+      const vaultTransferred = depositJson.vaultTransfers?.some(vt => vt.status === 'confirmed') || false;
+      const latestVaultTransfer = depositJson.vaultTransfers?.[0] || null;
+
+      return {
+        ...depositJson,
+        vaultTransferred,
+        latestVaultTransfer
+      };
+    });
+
     res.set('X-Total-Count', count.toString());
-    res.json(rows);
+    res.json(depositsWithVaultInfo);
   } catch (error) {
     console.error('입금 내역 조회 실패:', error);
     res.status(500).json({
@@ -430,15 +453,38 @@ exports.getActiveDeposits = async (req, res) => {
       return res.status(400).json({ error: 'userId is required' });
     }
 
+    const { VaultTransfer } = require('../models');
+
     const deposits = await Deposit.findAll({
       where: {
         userId,
         status: { [Op.in]: ['detected', 'confirming'] }
       },
+      include: [
+        {
+          model: VaultTransfer,
+          as: 'vaultTransfers',
+          required: false,
+          attributes: ['id', 'status', 'txHash', 'feeAmount', 'feeRate', 'transferredAt', 'confirmedAt']
+        }
+      ],
       order: [['detectedAt', 'DESC']]
     });
 
-    res.json(deposits);
+    // Vault 전송 정보 추가 (진행 중인 입금은 보통 전송 전이지만 일관성을 위해 포함)
+    const depositsWithVaultInfo = deposits.map(deposit => {
+      const depositJson = deposit.toJSON();
+      const vaultTransferred = depositJson.vaultTransfers?.some(vt => vt.status === 'confirmed') || false;
+      const latestVaultTransfer = depositJson.vaultTransfers?.[0] || null;
+
+      return {
+        ...depositJson,
+        vaultTransferred,
+        latestVaultTransfer
+      };
+    });
+
+    res.json(depositsWithVaultInfo);
   } catch (error) {
     console.error('진행 중인 입금 조회 실패:', error);
     res.status(500).json({
@@ -461,19 +507,45 @@ exports.getDepositHistory = async (req, res) => {
     }
 
     const offset = (parseInt(page) - 1) * parseInt(limit);
+    const { VaultTransfer } = require('../models');
 
     const { count, rows } = await Deposit.findAndCountAll({
       where: {
         userId,
         status: { [Op.in]: ['confirmed', 'credited'] }
       },
+      include: [
+        {
+          model: VaultTransfer,
+          as: 'vaultTransfers',
+          required: false,
+          attributes: ['id', 'status', 'txHash', 'amount', 'feeAmount', 'feeRate', 'transferredAt', 'confirmedAt']
+        }
+      ],
       limit: parseInt(limit),
       offset,
       order: [['confirmedAt', 'DESC'], ['detectedAt', 'DESC']]
     });
 
+    // Vault 전송 정보를 포함한 응답 생성
+    const depositsWithVaultInfo = rows.map(deposit => {
+      const depositJson = deposit.toJSON();
+
+      // Vault 전송 완료 여부 (confirmed 상태인 전송이 있으면 true)
+      const vaultTransferred = depositJson.vaultTransfers?.some(vt => vt.status === 'confirmed') || false;
+
+      // 최신 Vault 전송 정보
+      const latestVaultTransfer = depositJson.vaultTransfers?.[0] || null;
+
+      return {
+        ...depositJson,
+        vaultTransferred,
+        latestVaultTransfer
+      };
+    });
+
     res.json({
-      deposits: rows,
+      deposits: depositsWithVaultInfo,
       total: count,
       page: parseInt(page),
       limit: parseInt(limit),

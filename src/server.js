@@ -8,6 +8,7 @@ const swaggerSpec = require('./config/swagger');
 const db = require('./models');
 const routes = require('./routes');
 const depositCrawler = require('./services/depositCrawler');
+const vaultTransferCrawler = require('./services/vaultTransferCrawler');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -60,6 +61,9 @@ const startServer = async () => {
 
       // 입금 모니터링 크롤러 시작
       depositCrawler.start();
+
+      // Vault 전송 크롤러 시작
+      vaultTransferCrawler.start();
     });
   } catch (error) {
     console.error('❌ Unable to connect to the database:', error);
@@ -73,12 +77,14 @@ startServer();
 process.on('SIGINT', () => {
   console.log('\n🛑 Shutting down server...');
   depositCrawler.stop();
+  vaultTransferCrawler.stop();
   process.exit(0);
 });
 
 process.on('SIGTERM', () => {
   console.log('\n🛑 Shutting down server...');
   depositCrawler.stop();
+  vaultTransferCrawler.stop();
   process.exit(0);
 });
 
