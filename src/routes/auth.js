@@ -440,4 +440,58 @@ router.post('/verify-otp', authController.verifyOtp);
  */
 router.post('/signup', authController.signup);
 
+/**
+ * @swagger
+ * /api/auth/complete-ga-setup:
+ *   post:
+ *     summary: Google Authenticator 설정 완료 (최초 로그인 시)
+ *     tags: [Authentication]
+ *     description: 최초 로그인 시 GA 설정을 완료하고 JWT 토큰 발급
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - userId
+ *               - secretKey
+ *               - memberType
+ *             properties:
+ *               userId:
+ *                 type: string
+ *                 example: 'user_1234567890_abc123'
+ *               secretKey:
+ *                 type: string
+ *                 example: 'JBSWY3DPEHPK3PXP'
+ *                 description: Google Authenticator secret key (Base32)
+ *               memberType:
+ *                 type: string
+ *                 enum: [individual, corporate]
+ *                 example: 'individual'
+ *     responses:
+ *       200:
+ *         description: GA 설정 완료 및 JWT 토큰 발급
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 token:
+ *                   type: string
+ *                 expiresIn:
+ *                   type: string
+ *                 user:
+ *                   type: object
+ *       400:
+ *         description: 필수 필드 누락
+ *       404:
+ *         description: 사용자를 찾을 수 없음
+ */
+router.post('/complete-ga-setup', authController.completeGASetup);
+
 module.exports = router;

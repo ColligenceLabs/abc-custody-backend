@@ -693,3 +693,93 @@ exports.signup = async (req, res) => {
     });
   }
 };
+
+/**
+ * Google Authenticator 설정 완료
+ * POST /api/auth/complete-ga-setup
+ * 최초 로그인 시 GA 설정을 완료하고 JWT 토큰 발급
+ */
+exports.completeGASetup = async (req, res) => {
+  try {
+    const { userId, secretKey, memberType } = req.body;
+
+    // 입력 검증
+    if (!userId || !secretKey || !memberType) {
+      return res.status(400).json({
+        error: 'Validation error',
+        message: 'userId, secretKey, and memberType are required'
+      });
+    }
+
+    // 사용자 조회
+    const user = await User.findByPk(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        error: 'User not found',
+        message: 'No user found with this ID'
+      });
+    }
+
+    // 계정 상태 확인
+    if (user.status !== 'active') {
+      return res.status(403).json({
+        error: 'Account not active',
+        message: `Your account is ${user.status}. Please contact administrator.`
+      });
+    }
+
+    // GA 설정 정보 업데이트
+    await user.update({
+      hasGASetup: true,
+      gaSetupDate: new Date(),
+      isFirstLogin: false,
+      totpSecret: secretKey,
+      lastLogin: new Date()
+    });
+
+    // JWT 토큰 생성
+    const token = jwt.sign(
+      {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        memberType: user.memberType
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: process.env.JWT_EXPIRES_IN || '24h'
+      }
+    );
+
+    // 응답 (비밀번호와 totpSecret 제외)
+    const userResponse = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      status: user.status,
+      memberType: user.memberType,
+      phone: user.phone,
+      department: user.department,
+      position: user.position,
+      hasGASetup: true,
+      isFirstLogin: false
+    };
+
+    res.json({
+      success: true,
+      message: 'Google Authenticator setup completed',
+      token,
+      expiresIn: process.env.JWT_EXPIRES_IN || '24h',
+      user: userResponse
+    });
+
+  } catch (error) {
+    console.error('GA 설정 완료 실패:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error.message
+    });
+  }
+};
