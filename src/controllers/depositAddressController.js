@@ -165,20 +165,37 @@ exports.createDepositAddress = async (req, res) => {
     // 입금 주소에 0.01 ETH를 미리 지급하여 Vault 전송 시 가스비로 사용
     if ((network === 'Ethereum' || network === 'Holesky') && process.env.GAS_POOL_PRIVATE_KEY) {
       try {
-        const { createETHTransfer, sendTransaction } = require('../utils/ethereum');
+        const { ethers } = require('ethers');
+        const { createETHTransfer, sendTransaction, getEthBalance } = require('../utils/ethereum');
 
         const GAS_POOL_PRIVATE_KEY = process.env.GAS_POOL_PRIVATE_KEY;
         const GAS_AMOUNT = process.env.GAS_POOL_AMOUNT || '0.01'; // 기본값 0.01 ETH
 
+        // Private key로부터 발신 주소 추출
+        const gasPoolWallet = new ethers.Wallet(GAS_POOL_PRIVATE_KEY);
+        const fromAddress = gasPoolWallet.address;
+
+        // 가스 풀 주소의 잔액 확인
+        const { balance } = await getEthBalance(fromAddress);
+        console.log(`[MVP Demo] 가스 풀 주소: ${fromAddress}`);
+        console.log(`[MVP Demo] 가스 풀 잔액: ${balance} ETH`);
+
+        if (parseFloat(balance) < parseFloat(GAS_AMOUNT)) {
+          console.error(`[MVP Demo] 가스비 전송 실패: 잔액 부족 (필요: ${GAS_AMOUNT} ETH, 현재: ${balance} ETH)`);
+          throw new Error('가스 풀 잔액 부족');
+        }
+
         console.log(`[MVP Demo] 새 입금 주소 ${address}에 가스비 ${GAS_AMOUNT} ETH 전송 중...`);
 
-        const signedTx = await createETHTransfer(GAS_POOL_PRIVATE_KEY, address, GAS_AMOUNT);
+        const signedTx = await createETHTransfer(fromAddress, address, GAS_AMOUNT, GAS_POOL_PRIVATE_KEY);
         const { txHash } = await sendTransaction(signedTx);
 
         console.log(`[MVP Demo] 가스비 전송 완료: ${txHash}`);
+        console.log(`[MVP Demo] 트랜잭션 확인: https://holesky.etherscan.io/tx/${txHash}`);
       } catch (gasError) {
         // 가스비 전송 실패해도 입금 주소는 생성
         console.error('[MVP Demo] 가스비 전송 실패:', gasError.message);
+        console.error('[MVP Demo] 상세 에러:', gasError);
       }
     }
 
