@@ -609,3 +609,87 @@ exports.verifyEmail = async (req, res) => {
     });
   }
 };
+
+/**
+ * 회원가입
+ * POST /api/auth/signup
+ */
+exports.signup = async (req, res) => {
+  try {
+    const userData = req.body;
+
+    // 필수 필드 검증
+    if (!userData.email || !userData.phone) {
+      return res.status(400).json({
+        error: 'Validation error',
+        message: 'Email and phone are required'
+      });
+    }
+
+    // 이메일 중복 확인
+    const existingUser = await User.findOne({
+      where: { email: userData.email }
+    });
+
+    if (existingUser) {
+      return res.status(409).json({
+        error: 'Email already exists',
+        message: 'This email is already registered'
+      });
+    }
+
+    // ID 자동 생성
+    if (!userData.id) {
+      userData.id = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    }
+
+    // 기본값 설정 (회원가입은 viewer 권한으로만 생성)
+    const newUserData = {
+      ...userData,
+      role: 'viewer',
+      status: 'active',
+      hasGASetup: false,
+      isFirstLogin: true
+    };
+
+    // 사용자 생성
+    const user = await User.create(newUserData);
+
+    // 비밀번호와 민감한 정보 제외하고 응답
+    const userResponse = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      role: user.role,
+      status: user.status,
+      memberType: user.memberType,
+      department: user.department,
+      position: user.position
+    };
+
+    res.status(201).json({
+      success: true,
+      message: 'User registered successfully',
+      user: userResponse
+    });
+
+  } catch (error) {
+    console.error('회원가입 실패:', error);
+
+    if (error.name === 'SequelizeValidationError') {
+      return res.status(400).json({
+        error: 'Validation error',
+        details: error.errors.map(e => ({
+          field: e.path,
+          message: e.message
+        }))
+      });
+    }
+
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error.message
+    });
+  }
+};

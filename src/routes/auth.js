@@ -386,4 +386,58 @@ router.post('/verify-email', authController.verifyEmail);
  */
 router.post('/verify-otp', authController.verifyOtp);
 
+/**
+ * @swagger
+ * /api/auth/signup:
+ *   post:
+ *     summary: 회원가입 (인증 없이 누구나 가입 가능)
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - phone
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: '홍길동'
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: 'user@example.com'
+ *               phone:
+ *                 type: string
+ *                 example: '010-1234-5678'
+ *               memberType:
+ *                 type: string
+ *                 enum: [individual, corporate]
+ *                 example: 'individual'
+ *               fundSource:
+ *                 type: string
+ *                 example: 'salary'
+ *     responses:
+ *       201:
+ *         description: 회원가입 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 user:
+ *                   type: object
+ *       400:
+ *         description: 유효성 검증 실패
+ *       409:
+ *         description: 이메일 중복
+ */
+router.post('/signup', authController.signup);
+
 module.exports = router;
