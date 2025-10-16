@@ -7,6 +7,7 @@ const usersRouter = require('./users');
 const addressesRouter = require('./addresses');
 const depositAddressesRouter = require('./depositAddresses');
 const depositsRouter = require('./deposits');
+const withdrawalsRouter = require('./withdrawals');
 
 /**
  * @swagger
@@ -42,5 +43,6 @@ router.use('/users', usersRouter);
 router.use('/addresses', addressesRouter);
 router.use('/depositAddresses', depositAddressesRouter);
 router.use('/deposits', depositsRouter);
+router.use('/withdrawals', withdrawalsRouter);
 
 module.exports = router;

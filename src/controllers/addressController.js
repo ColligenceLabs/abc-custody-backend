@@ -6,6 +6,12 @@ const { Address } = require('../models');
  */
 exports.getAddresses = async (req, res) => {
   try {
+    console.log('📥 주소 조회 요청:', {
+      query: req.query,
+      body: req.body,
+      params: req.params
+    });
+
     const {
       userId,
       type,
@@ -21,6 +27,8 @@ exports.getAddresses = async (req, res) => {
     if (type) where.type = type;
     if (coin) where.coin = coin;
 
+    console.log('🔍 WHERE 조건:', where);
+
     const page = parseInt(_page);
     const limit = parseInt(_limit);
     const offset = (page - 1) * limit;
@@ -30,6 +38,12 @@ exports.getAddresses = async (req, res) => {
       limit,
       offset,
       order: [[_sort, _order.toUpperCase()]]
+    });
+
+    console.log('✅ 조회 결과:', {
+      count,
+      rowsLength: rows.length,
+      rows: rows.map(r => ({ id: r.id, userId: r.userId, coin: r.coin, label: r.label, canWithdraw: r.permissions.canWithdraw }))
     });
 
     res.set('X-Total-Count', count.toString());
