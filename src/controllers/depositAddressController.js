@@ -161,6 +161,27 @@ exports.createDepositAddress = async (req, res) => {
     // 백엔드에서 지갑 생성
     const { address, privateKey } = generateWalletByCoin(coin);
 
+    // MVP 시연용: Ethereum 네트워크 지갑 생성 시 가스비 자동 지급
+    // 입금 주소에 0.01 ETH를 미리 지급하여 Vault 전송 시 가스비로 사용
+    if ((network === 'Ethereum' || network === 'Holesky') && process.env.GAS_POOL_PRIVATE_KEY) {
+      try {
+        const { createETHTransfer, sendTransaction } = require('../utils/ethereum');
+
+        const GAS_POOL_PRIVATE_KEY = process.env.GAS_POOL_PRIVATE_KEY;
+        const GAS_AMOUNT = process.env.GAS_POOL_AMOUNT || '0.01'; // 기본값 0.01 ETH
+
+        console.log(`[MVP Demo] 새 입금 주소 ${address}에 가스비 ${GAS_AMOUNT} ETH 전송 중...`);
+
+        const signedTx = await createETHTransfer(GAS_POOL_PRIVATE_KEY, address, GAS_AMOUNT);
+        const { txHash } = await sendTransaction(signedTx);
+
+        console.log(`[MVP Demo] 가스비 전송 완료: ${txHash}`);
+      } catch (gasError) {
+        // 가스비 전송 실패해도 입금 주소는 생성
+        console.error('[MVP Demo] 가스비 전송 실패:', gasError.message);
+      }
+    }
+
     // ID와 addedAt 자동 생성
     const depositAddressData = {
       id: `dep_addr_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
