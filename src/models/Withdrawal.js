@@ -50,19 +50,27 @@ module.exports = (sequelize) => {
     // 상태 관리
     status: {
       type: DataTypes.ENUM(
-        'draft',
-        'submitted',
-        'approved',
-        'pending',
-        'processing',
-        'completed',
-        'rejected',
-        'cancelled',
-        'archived',
-        'stopped'
+        // 공통 상태
+        'withdrawal_wait',       // 출금대기 (24시간 홀드)
+        'aml_review',           // AML 검토 중
+        'approval_pending',     // 승인 대기 (AML 통과 후)
+        'aml_issue',            // AML 문제 감지
+        'processing',           // 블록체인 전송 처리 중
+        'withdrawal_pending',   // 출금 대기 중 (BlockDaemon API 호출 완료)
+        'transferring',         // 출금중 (TxHash 기록됨, 블록체인 전송 중)
+        'success',              // 출금 완료
+        'failed',               // 기술적 실패 (재시도 가능)
+        'admin_rejected',       // 관리자 거부 (재시도 불가)
+        'withdrawal_stopped',   // 사용자 취소
+
+        // 기업회원 전용
+        'withdrawal_request',   // 출금 신청 (최초)
+        'withdrawal_reapply',   // 재신청 (반려 후)
+        'rejected',             // 결재 반려
+        'archived'              // 아카이브 처리 (종료)
       ),
       allowNull: false,
-      defaultValue: 'draft'
+      defaultValue: 'withdrawal_wait'  // 개인 회원 기본값 (출금 대기)
     },
     priority: {
       type: DataTypes.ENUM('low', 'medium', 'high', 'critical'),
@@ -118,6 +126,14 @@ module.exports = (sequelize) => {
 
     // 블록체인 정보
     txHash: {
+      type: DataTypes.STRING,
+      allowNull: true
+    },
+    txid: {
+      type: DataTypes.STRING,
+      allowNull: true
+    },
+    blockdaemonTransactionId: {
       type: DataTypes.STRING,
       allowNull: true
     },

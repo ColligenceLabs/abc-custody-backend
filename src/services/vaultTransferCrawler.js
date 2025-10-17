@@ -102,8 +102,15 @@ async function runVaultTransferCrawler() {
     await checkSentTransfers();
 
     // 1. BlockDaemon Vault 주소 조회
-    const vaultAddress = await getDefaultVaultEthAddress();
-    console.log(`[Vault Transfer] 목적지 Vault 주소: ${vaultAddress}`);
+    let vaultAddress;
+    try {
+      vaultAddress = await getDefaultVaultEthAddress();
+      console.log(`[Vault Transfer] 목적지 Vault 주소: ${vaultAddress}`);
+    } catch (error) {
+      console.warn('[Vault Transfer] Vault 주소 조회 실패:', error.message);
+      console.warn('[Vault Transfer] BlockDaemon Vault가 설정되지 않았습니다. 크롤러를 스킵합니다.');
+      return;
+    }
 
     // 2. 전송 대상 입금 조회
     const { Op } = require('sequelize');

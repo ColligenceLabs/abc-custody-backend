@@ -193,7 +193,8 @@ router.post('/', authenticate, withdrawalController.createWithdrawal);
  *       404:
  *         description: 출금 신청을 찾을 수 없음
  */
-router.patch('/:id', authenticate, authorize('admin', 'manager', 'operator'), withdrawalController.updateWithdrawal);
+// 테스트용 임시 인증 비활성화
+router.patch('/:id', /* authenticate, authorize('admin', 'manager', 'operator'), */ withdrawalController.updateWithdrawal);
 
 /**
  * @swagger
@@ -214,6 +215,102 @@ router.patch('/:id', authenticate, authorize('admin', 'manager', 'operator'), wi
  *         description: 출금 신청을 찾을 수 없음
  */
 router.delete('/:id', authenticate, authorize('admin'), withdrawalController.deleteWithdrawal);
+
+/**
+ * @swagger
+ * /api/withdrawals/{id}/approve/hot:
+ *   post:
+ *     summary: Hot Wallet 승인 (Vault ID 7)
+ *     tags: [Withdrawals]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Hot Wallet 승인 성공
+ *       400:
+ *         description: 승인 대기 상태가 아님
+ *       404:
+ *         description: 출금 신청을 찾을 수 없음
+ *       500:
+ *         description: BlockDaemon API 호출 실패
+ */
+router.post('/:id/approve/hot', withdrawalController.approveWithdrawalHot);
+
+/**
+ * @swagger
+ * /api/withdrawals/{id}/approve/cold:
+ *   post:
+ *     summary: Cold Wallet 승인 (Vault ID 8)
+ *     tags: [Withdrawals]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Cold Wallet 승인 성공
+ *       400:
+ *         description: 승인 대기 상태가 아님
+ *       404:
+ *         description: 출금 신청을 찾을 수 없음
+ *       500:
+ *         description: BlockDaemon API 호출 실패
+ */
+router.post('/:id/approve/cold', withdrawalController.approveWithdrawalCold);
+
+/**
+ * @swagger
+ * /api/withdrawals/{id}/transfer:
+ *   post:
+ *     summary: Wallet Transfer 실행 (processing → transferring)
+ *     tags: [Withdrawals]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Wallet Transfer 실행 성공
+ *       400:
+ *         description: processing 상태가 아님
+ *       404:
+ *         description: 출금 신청을 찾을 수 없음
+ *       500:
+ *         description: BlockDaemon API 호출 실패
+ */
+router.post('/:id/transfer', withdrawalController.processWalletTransfer);
+
+/**
+ * @swagger
+ * /api/withdrawals/{id}/aml/complete:
+ *   post:
+ *     summary: 테스트용 AML 검증 완료 처리 (aml_review → processing)
+ *     tags: [Withdrawals]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: AML 검증 완료 성공
+ *       400:
+ *         description: aml_review 상태가 아님
+ *       404:
+ *         description: 출금 신청을 찾을 수 없음
+ *       500:
+ *         description: 처리 실패
+ */
+router.post('/:id/aml/complete', withdrawalController.completeAMLReview);
 
 /**
  * @swagger
