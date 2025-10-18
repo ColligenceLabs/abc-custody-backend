@@ -11,6 +11,7 @@ const depositCrawler = require('./services/depositCrawler');
 const vaultTransferCrawler = require('./services/vaultTransferCrawler');
 const withdrawalScheduler = require('./services/withdrawalScheduler');
 const withdrawalPendingCrawler = require('./services/withdrawalPendingCrawler');
+const withdrawalConfirmationCrawler = require('./services/withdrawalConfirmationCrawler');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -72,6 +73,9 @@ const startServer = async () => {
 
       // 출금 처리 중 상태 모니터링 크롤러 시작
       withdrawalPendingCrawler.start();
+
+      // 출금 최종 확인 크롤러 시작 (transferring → processing → success)
+      withdrawalConfirmationCrawler.start();
     });
   } catch (error) {
     console.error('❌ Unable to connect to the database:', error);
@@ -88,6 +92,7 @@ process.on('SIGINT', () => {
   vaultTransferCrawler.stop();
   withdrawalScheduler.stop();
   withdrawalPendingCrawler.stop();
+  withdrawalConfirmationCrawler.stop();
   process.exit(0);
 });
 
@@ -97,6 +102,7 @@ process.on('SIGTERM', () => {
   vaultTransferCrawler.stop();
   withdrawalScheduler.stop();
   withdrawalPendingCrawler.stop();
+  withdrawalConfirmationCrawler.stop();
   process.exit(0);
 });
 
